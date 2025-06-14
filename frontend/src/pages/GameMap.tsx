@@ -18,6 +18,8 @@ interface Character {
 }
 
 const MOVE_STEP = 5; // Percentage of map size to move per keypress
+const PROXIMITY_RADIUS = 20; // Percentage of map size for proximity detection
+const CHARACTER_RADIUS = 50; // Pixels for character size
 
 const GameMap: React.FC = () => {
     const { characterId } = useParams<{ characterId: string }>();
@@ -30,6 +32,35 @@ const GameMap: React.FC = () => {
     const isMovingRef = useRef(false);
     const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const currentPositionRef = useRef<GamePosition | null>(null);
+    const [nearbyCharacters, setNearbyCharacters] = useState<number[]>([]);
+
+    // Calculate distance between two positions
+    const calculateDistance = (pos1: GamePosition, pos2: GamePosition): number => {
+        const dx = pos1.position_x - pos2.position_x;
+        const dy = pos1.position_y - pos2.position_y;
+        return Math.sqrt(dx * dx + dy * dy);
+    };
+
+    // Check for nearby characters
+    const checkProximity = (currentPosition: GamePosition) => {
+        const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
+        const nearby: number[] = [];
+
+        positions.forEach((position) => {
+            if (position.character_id !== currentCharacterId) {
+                const distance = calculateDistance(currentPosition, position);
+                console.log(`[GameMap] Distance to character ${position.character_id}: ${distance.toFixed(2)}%`);
+                
+                if (distance < PROXIMITY_RADIUS) {
+                    console.log(`[GameMap] Character ${position.character_id} is nearby! Distance: ${distance.toFixed(2)}%`);
+                    nearby.push(currentCharacterId); // Add current character to nearby list
+                }
+            }
+        });
+
+        console.log('[GameMap] Nearby characters:', nearby);
+        setNearbyCharacters(nearby);
+    };
 
     const handleKeyPress = async (event: KeyboardEvent) => {
         if (!characterId || isMovingRef.current) return;
@@ -92,6 +123,9 @@ const GameMap: React.FC = () => {
                     ? newPosition
                     : pos
             ));
+
+            // Check for nearby characters
+            checkProximity(newPosition);
 
             // Send update to server
             const response = await axios.put(`http://localhost:3001/api/game/move/${storedCharacterId}`, {
@@ -234,6 +268,7 @@ const GameMap: React.FC = () => {
             const newPosition = positions.find(p => p.character_id === parseInt(storedCharacterId));
             if (newPosition) {
                 currentPositionRef.current = newPosition;
+                checkProximity(newPosition);
             }
         }
     }, [positions]);
@@ -260,8 +295,47 @@ const GameMap: React.FC = () => {
         <div className="game-map">
             <h1>Game Map</h1>
             <div className="map-container" style={{ position: 'relative', width: '800px', height: '600px', border: '1px solid black' }}>
+                {/* Render circles for all players */}
+                {positions.map((position) => {
+                    const isNearby = nearbyCharacters.includes(position.character_id);
+                    const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
+                    const isCurrentCharacter = position.character_id === currentCharacterId;
+
+                    console.log('Character:', position.character_id, {
+                        isCurrentCharacter,
+                        currentCharacterId,
+                        isNearby,
+                        nearbyCharacters
+                    });
+
+                    return (
+                        <div
+                            key={`circle-${position.character_id}`}
+                            style={{
+                                position: 'absolute',
+                                left: `${position.position_x}%`,
+                                top: `${position.position_y}%`,
+                                transform: 'translate(-50%, -50%)',
+                                width: '150px',
+                                height: '150px',
+                                border: `4px solid ${isNearby && isCurrentCharacter ? '#ff0000' : 'rgba(0, 255, 0, 0.3)'}`,
+                                borderRadius: '50%',
+                                pointerEvents: 'none',
+                                zIndex: 0,
+                                opacity: isNearby && isCurrentCharacter ? 0.8 : 0.3,
+                                backgroundColor: isNearby && isCurrentCharacter ? 'rgba(255, 0, 0, 0.2)' : 'rgba(0, 255, 0, 0.1)',
+                                boxShadow: isNearby && isCurrentCharacter ? '0 0 20px rgba(255, 0, 0, 0.5)' : '0 0 20px rgba(0, 255, 0, 0.2)'
+                            }}
+                        />
+                    );
+                })}
+                {/* Render characters on top */}
                 {positions.map((position) => {
                     const character = characters[position.character_id];
+                    const isNearby = nearbyCharacters.includes(position.character_id);
+                    const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
+                    const isCurrentCharacter = position.character_id === currentCharacterId;
+
                     return character ? (
                         <div
                             key={`${position.character_id}-${position.id}`}
@@ -270,15 +344,17 @@ const GameMap: React.FC = () => {
                                 left: `${position.position_x}%`,
                                 top: `${position.position_y}%`,
                                 transform: 'translate(-50%, -50%)',
-                                width: '50px',
-                                height: '50px',
+                                width: `${CHARACTER_RADIUS * 2}px`,
+                                height: `${CHARACTER_RADIUS * 2}px`,
                                 backgroundImage: `url(${character.image})`,
                                 backgroundSize: 'cover',
                                 borderRadius: '50%',
-                                border: '2px solid white',
-                                boxShadow: '0 0 5px rgba(0,0,0,0.5)'
+                                border: isNearby && isCurrentCharacter ? '3px solid red' : '2px solid white',
+                                boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                                transition: 'border-color 0.2s ease-in-out',
+                                zIndex: 1
                             }}
-                            title={character.name}
+                            title={`${character.name}${isNearby && isCurrentCharacter ? ' (Nearby)' : ''}`}
                         />
                     ) : null;
                 })}
