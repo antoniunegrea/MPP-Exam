@@ -5,7 +5,7 @@ export type Character = {
   abilities: {
     strength: number;
     agility: number;
-    intelligence: number;
+    defense: number;
   };
 };
 
@@ -17,7 +17,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 95.5,
       agility: 85.2,
-      intelligence: 78.9
+      defense: 78.9
     }
   },
   {
@@ -27,7 +27,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 75.8,
       agility: 92.4,
-      intelligence: 88.7
+      defense: 88.7
     }
   },
   {
@@ -37,7 +37,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 90.1,
       agility: 82.3,
-      intelligence: 85.6
+      defense: 85.6
     }
   },
   {
@@ -47,7 +47,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 65.4,
       agility: 88.9,
-      intelligence: 94.2
+      defense: 94.2
     }
   },
   {
@@ -57,7 +57,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 88.7,
       agility: 86.5,
-      intelligence: 91.3
+      defense: 91.3
     }
   },
   {
@@ -67,7 +67,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 82.4,
       agility: 89.7,
-      intelligence: 87.2
+      defense: 87.2
     }
   },
   {
@@ -77,7 +77,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 96.8,
       agility: 84.3,
-      intelligence: 76.5
+      defense: 76.5
     }
   },
   {
@@ -87,7 +87,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 87.6,
       agility: 83.9,
-      intelligence: 79.4
+      defense: 79.4
     }
   },
   {
@@ -97,7 +97,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 78.3,
       agility: 91.5,
-      intelligence: 89.8
+      defense: 89.8
     }
   },
   {
@@ -107,7 +107,7 @@ export const characters: Character[] = [
     abilities: {
       strength: 85.2,
       agility: 93.7,
-      intelligence: 72.4
+      defense: 72.4
     }
   }
 ]; 

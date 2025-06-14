@@ -29,8 +29,10 @@
 }
 
 .character-content img {
-  width: 300px;
-  height: auto;
+  width: 400px;
+  height: 400px;
+  object-fit: contain;
+  background-color: #f5f5f5;
   border-radius: 8px;
 }
 

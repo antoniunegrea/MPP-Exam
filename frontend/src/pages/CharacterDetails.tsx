@@ -48,14 +48,14 @@ const CharacterDetails: React.FC = () => {
                 <span className="ability-value">{character.abilities.agility}</span>
               </div>
               <div className="ability">
-                <span className="ability-name">Intelligence</span>
+                <span className="ability-name">Defense</span>
                 <div className="ability-bar">
                   <div 
                     className="ability-fill" 
-                    style={{ width: `${character.abilities.intelligence}%` }}
+                    style={{ width: `${character.abilities.defense}%` }}
                   />
                 </div>
-                <span className="ability-value">{character.abilities.intelligence}</span>
+                <span className="ability-value">{character.abilities.defense}</span>
               </div>
             </div>
           </div>
