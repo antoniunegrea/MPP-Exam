@@ -1,81 +1,89 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { Character } from '../types/Character';
-
-const API_URL = 'http://localhost:3001/api/characters';
 
 interface CharacterContextType {
   characters: Character[];
-  addCharacter: (character: Omit<Character, 'id'>) => Promise<void>;
-  updateCharacter: (id: number, character: Omit<Character, 'id'>) => Promise<void>;
-  deleteCharacter: (id: number) => Promise<void>;
+  addCharacter: (character: Omit<Character, 'id'>) => void;
+  updateCharacter: (id: number, character: Omit<Character, 'id'>) => void;
+  deleteCharacter: (id: number) => void;
 }
 
 const CharacterContext = createContext<CharacterContextType | undefined>(undefined);
 
+const WS_URL = 'ws://localhost:3001';
+
 export const CharacterProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [characters, setCharacters] = useState<Character[]>([]);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  // Fetch characters on mount
   useEffect(() => {
-    fetchCharacters();
+    wsRef.current = new WebSocket(WS_URL);
+
+    wsRef.current.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    wsRef.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      switch (data.type) {
+        case 'INITIAL_CHARACTERS':
+          setCharacters(data.characters);
+          break;
+        case 'NEW_CHARACTER':
+          setCharacters(prev => [...prev, data.character]);
+          break;
+        case 'CHARACTER_UPDATED':
+          setCharacters(prev => prev.map(char => 
+            char.id === data.character.id ? data.character : char
+          ));
+          break;
+        case 'CHARACTER_DELETED':
+          setCharacters(prev => prev.filter(char => char.id !== data.id));
+          break;
+      }
+    };
+
+    wsRef.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    wsRef.current.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
   }, []);
 
-  const fetchCharacters = async () => {
-    try {
-      const response = await fetch(API_URL);
-      const data = await response.json();
-      setCharacters(data);
-    } catch (error) {
-      console.error('Error fetching characters:', error);
+  const addCharacter = (character: Omit<Character, 'id'>) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'ADD_CHARACTER',
+        character
+      }));
     }
   };
 
-  const addCharacter = async (newCharacter: Omit<Character, 'id'>) => {
-    try {
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(newCharacter),
-      });
-      const data = await response.json();
-      setCharacters(prevCharacters => [...prevCharacters, data]);
-    } catch (error) {
-      console.error('Error adding character:', error);
+  const updateCharacter = (id: number, character: Omit<Character, 'id'>) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'UPDATE_CHARACTER',
+        id,
+        character
+      }));
     }
   };
 
-  const updateCharacter = async (id: number, updatedCharacter: Omit<Character, 'id'>) => {
-    try {
-      const response = await fetch(`${API_URL}/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(updatedCharacter),
-      });
-      const data = await response.json();
-      setCharacters(prevCharacters =>
-        prevCharacters.map(character =>
-          character.id === id ? data : character
-        )
-      );
-    } catch (error) {
-      console.error('Error updating character:', error);
-    }
-  };
-
-  const deleteCharacter = async (id: number) => {
-    try {
-      await fetch(`${API_URL}/${id}`, {
-        method: 'DELETE',
-      });
-      setCharacters(prevCharacters =>
-        prevCharacters.filter(character => character.id !== id)
-      );
-    } catch (error) {
-      console.error('Error deleting character:', error);
+  const deleteCharacter = (id: number) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({
+        type: 'DELETE_CHARACTER',
+        id
+      }));
     }
   };
 
