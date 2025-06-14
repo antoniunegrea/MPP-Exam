@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
@@ -17,6 +17,8 @@ interface Character {
     image: string;
 }
 
+const MOVE_STEP = 5; // Percentage of map size to move per keypress
+
 const GameMap: React.FC = () => {
     const { characterId } = useParams<{ characterId: string }>();
     const navigate = useNavigate();
@@ -24,6 +26,62 @@ const GameMap: React.FC = () => {
     const [positions, setPositions] = useState<GamePosition[]>([]);
     const [characters, setCharacters] = useState<{ [key: number]: Character }>({});
     const [hasJoined, setHasJoined] = useState(false);
+    const isJoiningRef = useRef(false);
+    const isMovingRef = useRef(false);
+
+    const handleKeyPress = async (event: KeyboardEvent) => {
+        if (!characterId || isMovingRef.current) return;
+
+        const storedCharacterId = localStorage.getItem('currentGameCharacterId');
+        if (!storedCharacterId) return;
+
+        const currentPosition = positions.find(p => p.character_id === parseInt(storedCharacterId));
+        if (!currentPosition) return;
+
+        let newX = currentPosition.position_x;
+        let newY = currentPosition.position_y;
+
+        switch (event.key) {
+            case 'ArrowUp':
+                newY = Math.max(0, currentPosition.position_y - MOVE_STEP);
+                break;
+            case 'ArrowDown':
+                newY = Math.min(100, currentPosition.position_y + MOVE_STEP);
+                break;
+            case 'ArrowLeft':
+                newX = Math.max(0, currentPosition.position_x - MOVE_STEP);
+                break;
+            case 'ArrowRight':
+                newX = Math.min(100, currentPosition.position_x + MOVE_STEP);
+                break;
+            default:
+                return;
+        }
+
+        // Only update if position actually changed
+        if (newX === currentPosition.position_x && newY === currentPosition.position_y) return;
+
+        isMovingRef.current = true;
+        try {
+            console.log(`[GameMap] Moving character ${storedCharacterId} to (${newX}, ${newY})`);
+            const response = await axios.put(`http://localhost:3001/api/game/move/${storedCharacterId}`, {
+                position_x: newX,
+                position_y: newY
+            });
+            console.log('[GameMap] Move response:', response.data);
+
+            // Update local positions state
+            setPositions(prev => prev.map(pos => 
+                pos.character_id === parseInt(storedCharacterId)
+                    ? { ...pos, position_x: newX, position_y: newY }
+                    : pos
+            ));
+        } catch (error) {
+            console.error('[GameMap] Error moving character:', error);
+        } finally {
+            isMovingRef.current = false;
+        }
+    };
 
     useEffect(() => {
         console.log(`[GameMap] Component mounted/updated with characterId: ${characterId}, hasJoined: ${hasJoined}`);
@@ -41,8 +99,9 @@ const GameMap: React.FC = () => {
 
         // Join the game only once
         const joinGame = async () => {
-            if (!hasJoined && characterId) {
+            if (!hasJoined && characterId && !isJoiningRef.current) {
                 console.log(`[GameMap] Attempting to join game for character ${characterId}`);
+                isJoiningRef.current = true;
                 try {
                     const joinResponse = await axios.post(`http://localhost:3001/api/game/join/${characterId}`);
                     console.log('[GameMap] Join game response:', joinResponse.data);
@@ -54,9 +113,11 @@ const GameMap: React.FC = () => {
                     setPositions(positionsResponse.data);
                 } catch (error) {
                     console.error('[GameMap] Error joining game:', error);
+                } finally {
+                    isJoiningRef.current = false;
                 }
             } else {
-                console.log(`[GameMap] Skipping join game - hasJoined: ${hasJoined}, characterId: ${characterId}`);
+                console.log(`[GameMap] Skipping join game - hasJoined: ${hasJoined}, characterId: ${characterId}, isJoining: ${isJoiningRef.current}`);
             }
         };
 
@@ -96,16 +157,28 @@ const GameMap: React.FC = () => {
             });
         });
 
+        // Listen for position updates
+        newSocket.on('positionUpdated', (position: GamePosition) => {
+            console.log('[GameMap] Received positionUpdated event:', position);
+            setPositions(prev => prev.map(p => 
+                p.character_id === position.character_id ? position : p
+            ));
+        });
+
         // Listen for players leaving
         newSocket.on('playerLeft', (characterId: number) => {
             console.log(`[GameMap] Received playerLeft event for character ${characterId}`);
             setPositions(prev => prev.filter(pos => pos.character_id !== characterId));
         });
 
+        // Add keyboard event listener
+        window.addEventListener('keydown', handleKeyPress);
+
         // Cleanup function
         return () => {
             console.log('[GameMap] Component unmounting, cleaning up...');
             newSocket.close();
+            window.removeEventListener('keydown', handleKeyPress);
             // Remove character ID from localStorage when component unmounts
             localStorage.removeItem('currentGameCharacterId');
         };

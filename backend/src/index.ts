@@ -2,17 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import { CharacterContext } from './context/CharacterContext';
 import { GameContext } from './context/GameContext';
+import { initializeIO } from './config/io';
 import { createServer } from 'http';
-import { Server } from 'socket.io';
 
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-    cors: {
-        origin: '*',
-        methods: ['GET', 'POST']
-    }
-});
+
+// Initialize Socket.io
+const io = initializeIO(httpServer);
+
+// Create GameContext after initializing Socket.io
+const gameContext = new GameContext(io);
 
 const port = process.env.PORT || 3001;
 
@@ -39,7 +39,6 @@ app.use((req, res, next) => {
 
 // Initialize contexts
 const characterContext = new CharacterContext();
-const gameContext = new GameContext();
 console.log('Contexts initialized');
 
 // WebSocket connection handling
@@ -172,6 +171,24 @@ app.get('/api/game/positions', async (req, res) => {
     } catch (error) {
         console.error('Error in GET /api/game/positions:', error);
         res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// Move character endpoint
+app.put('/api/game/move/:characterId', async (req, res) => {
+    try {
+        const characterId = parseInt(req.params.characterId);
+        const position = req.body;
+        
+        if (!position.position_x || !position.position_y) {
+            return res.status(400).json({ error: 'Position coordinates are required' });
+        }
+
+        const updatedPosition = await gameContext.moveCharacter(characterId, position);
+        res.json(updatedPosition);
+    } catch (error) {
+        console.error('Error moving character:', error);
+        res.status(500).json({ error: 'Failed to move character' });
     }
 });
 

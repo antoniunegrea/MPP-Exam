@@ -1,4 +1,5 @@
 import { supabase } from '../config/supabase';
+import { Server } from 'socket.io';
 
 export interface GamePosition {
     id: number;
@@ -9,6 +10,12 @@ export interface GamePosition {
 }
 
 export class GameContext {
+    private io: Server;
+
+    constructor(io: Server) {
+        this.io = io;
+    }
+
     async joinGame(characterId: number): Promise<GamePosition> {
         console.log(`[GameContext] joinGame called for character ${characterId} at ${new Date().toISOString()}`);
         try {
@@ -116,6 +123,42 @@ export class GameContext {
         } catch (error) {
             console.error(`[GameContext] Unexpected error in getPositionByCharacterId:`, error);
             return null;
+        }
+    }
+
+    async moveCharacter(characterId: number, position: { position_x: number, position_y: number }): Promise<GamePosition> {
+        console.log(`[GameContext] Moving character ${characterId} to (${position.position_x}, ${position.position_y})`);
+        
+        try {
+            // Update the position in the database
+            const { data, error } = await supabase
+                .from('game_positions')
+                .update({
+                    position_x: position.position_x,
+                    position_y: position.position_y
+                })
+                .eq('character_id', characterId)
+                .select()
+                .single();
+
+            if (error) {
+                console.error('[GameContext] Error updating position:', error);
+                throw error;
+            }
+
+            if (!data) {
+                throw new Error('No position found to update');
+            }
+
+            console.log('[GameContext] Successfully updated position:', data);
+            
+            // Broadcast the position update to all clients
+            this.io.emit('positionUpdated', data);
+            
+            return data;
+        } catch (error) {
+            console.error('[GameContext] Error in moveCharacter:', error);
+            throw error;
         }
     }
 } 
