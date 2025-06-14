@@ -2,37 +2,33 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
 import axios from 'axios';
+import { socket } from '../services/socket';
+import { GamePosition, Character } from '../types';
+import { CHARACTER_RADIUS, PROXIMITY_RADIUS } from '../constants';
 
-interface GamePosition {
-    id: number;
-    character_id: number;
-    position_x: number;
-    position_y: number;
-    created_at: string;
-}
-
-interface Character {
-    id: number;
-    name: string;
-    image: string;
+interface PlayerHealth {
+    characterId: number;
+    health: number;
+    maxHealth: number;
 }
 
 const MOVE_STEP = 5; // Percentage of map size to move per keypress
-const PROXIMITY_RADIUS = 20; // Percentage of map size for proximity detection
-const CHARACTER_RADIUS = 50; // Pixels for character size
 
 const GameMap: React.FC = () => {
     const { characterId } = useParams<{ characterId: string }>();
     const navigate = useNavigate();
     const [socket, setSocket] = useState<Socket | null>(null);
     const [positions, setPositions] = useState<GamePosition[]>([]);
-    const [characters, setCharacters] = useState<{ [key: number]: Character }>({});
+    const [characters, setCharacters] = useState<Record<number, Character>>({});
     const [hasJoined, setHasJoined] = useState(false);
     const isJoiningRef = useRef(false);
     const isMovingRef = useRef(false);
     const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const currentPositionRef = useRef<GamePosition | null>(null);
     const [nearbyCharacters, setNearbyCharacters] = useState<number[]>([]);
+    const [playerHealth, setPlayerHealth] = useState<Record<number, PlayerHealth>>({});
+    const [isFighting, setIsFighting] = useState(false);
+    const fightIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
     // Calculate distance between two positions
     const calculateDistance = (pos1: GamePosition, pos2: GamePosition): number => {
@@ -201,7 +197,7 @@ const GameMap: React.FC = () => {
         const fetchCharacters = async () => {
             try {
                 const response = await axios.get('http://localhost:3001/api/characters');
-                const characterMap: { [key: number]: Character } = {};
+                const characterMap: Record<number, Character> = {};
                 response.data.forEach((char: Character) => {
                     characterMap[char.id] = char;
                 });
@@ -291,6 +287,180 @@ const GameMap: React.FC = () => {
         }
     };
 
+    const calculateDamage = (attacker: Character, defender: Character): number => {
+        // Base damage is now much smaller and based on a percentage of the attacker's strength
+        // Assuming abilities are now 1-100 instead of 1-10
+        const baseDamage = Math.floor(attacker.abilities.strength * 0.02); // 2% of strength
+        
+        // Defense reduces damage by a percentage
+        const defenseReduction = Math.floor(defender.abilities.defense * 0.01); // 1% of defense
+        
+        // Speed adds a small bonus/penalty (ensure we have valid numbers)
+        const attackerSpeed = attacker.abilities.speed || 0;
+        const defenderSpeed = defender.abilities.speed || 0;
+        const speedFactor = Math.floor((attackerSpeed - defenderSpeed) * 0.005);
+        
+        // Calculate final damage (minimum 1)
+        const damage = Math.max(1, baseDamage - defenseReduction + speedFactor);
+        
+        console.log(`[Fight] ${attacker.name} deals ${damage} damage to ${defender.name}`, {
+            baseDamage,
+            defenseReduction,
+            speedFactor,
+            attackerSpeed,
+            defenderSpeed,
+            attackerAbilities: attacker.abilities,
+            defenderAbilities: defender.abilities
+        });
+        
+        return damage;
+    };
+
+    // Initialize health for a character if it doesn't exist
+    const initializeHealth = (characterId: number) => {
+        setPlayerHealth(prev => {
+            if (prev[characterId]) return prev; // Don't reset if health already exists
+            
+            return {
+                ...prev,
+                [characterId]: {
+                    characterId,
+                    health: 100,
+                    maxHealth: 100
+                }
+            };
+        });
+    };
+
+    // Initialize health for all characters when they first appear
+    useEffect(() => {
+        positions.forEach(position => {
+            initializeHealth(position.character_id);
+        });
+    }, [positions]);
+
+    const startFight = () => {
+        if (isFighting) return;
+        
+        const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
+        const currentCharacter = characters[currentCharacterId];
+        
+        // Find current character's position
+        const currentPosition = positions.find(p => p.character_id === currentCharacterId);
+        if (!currentPosition) return;
+        
+        // Find the closest opponent
+        const collidingOpponent = positions
+            .filter(pos => pos.character_id !== currentCharacterId) // Exclude current character
+            .map(pos => ({
+                ...pos,
+                distance: Math.sqrt(
+                    Math.pow(pos.position_x - currentPosition.position_x, 2) +
+                    Math.pow(pos.position_y - currentPosition.position_y, 2)
+                )
+            }))
+            .sort((a, b) => a.distance - b.distance)[0]; // Get the closest opponent
+        
+        if (!collidingOpponent || !currentCharacter) return;
+        
+        // Only start fight if within 50 pixels
+        if (collidingOpponent.distance > 50) return;
+        
+        const opponentCharacter = characters[collidingOpponent.character_id];
+        if (!opponentCharacter) return;
+        
+        console.log('[Fight] Starting fight between:', {
+            [currentCharacter.name]: currentCharacter.abilities,
+            [opponentCharacter.name]: opponentCharacter.abilities,
+            distance: collidingOpponent.distance
+        });
+
+        setIsFighting(true);
+
+        // Start fight interval with much shorter delay between hits
+        fightIntervalRef.current = setInterval(() => {
+            setPlayerHealth(prev => {
+                // Calculate damage for both players
+                const damageToOpponent = calculateDamage(currentCharacter, opponentCharacter);
+                const damageToCurrent = calculateDamage(opponentCharacter, currentCharacter);
+                
+                // Create new health state
+                const newHealth = {
+                    ...prev,
+                    [collidingOpponent.character_id]: {
+                        ...prev[collidingOpponent.character_id],
+                        health: Math.max(0, prev[collidingOpponent.character_id].health - damageToOpponent)
+                    },
+                    [currentCharacterId]: {
+                        ...prev[currentCharacterId],
+                        health: Math.max(0, prev[currentCharacterId].health - damageToCurrent)
+                    }
+                };
+                
+                console.log('[Fight] Health Update:', {
+                    [currentCharacter.name]: {
+                        current: newHealth[currentCharacterId].health,
+                        damageReceived: damageToCurrent,
+                        damageDealt: damageToOpponent,
+                        distance: collidingOpponent.distance
+                    },
+                    [opponentCharacter.name]: {
+                        current: newHealth[collidingOpponent.character_id].health,
+                        damageReceived: damageToOpponent,
+                        damageDealt: damageToCurrent,
+                        distance: collidingOpponent.distance
+                    }
+                });
+                
+                // Check if fight should end
+                if (newHealth[collidingOpponent.character_id].health <= 0 || 
+                    newHealth[currentCharacterId].health <= 0) {
+                    if (fightIntervalRef.current) {
+                        clearInterval(fightIntervalRef.current);
+                        setIsFighting(false);
+                        
+                        console.log('[Fight] Fight ended!', {
+                            winner: newHealth[collidingOpponent.character_id].health <= 0 ? currentCharacter.name : opponentCharacter.name,
+                            finalHealth: {
+                                [currentCharacter.name]: newHealth[currentCharacterId].health,
+                                [opponentCharacter.name]: newHealth[collidingOpponent.character_id].health
+                            }
+                        });
+                    }
+                }
+                
+                return newHealth;
+            });
+        }, 100); // Fight every 100ms for more immediate damage
+    };
+
+    const stopFight = () => {
+        if (fightIntervalRef.current) {
+            clearInterval(fightIntervalRef.current);
+            fightIntervalRef.current = null;
+        }
+        setIsFighting(false);
+    };
+
+    // Start fight when players are nearby
+    useEffect(() => {
+        const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
+        if (nearbyCharacters.includes(currentCharacterId) && !isFighting) {
+            startFight();
+        } else if (!nearbyCharacters.includes(currentCharacterId) && isFighting) {
+            stopFight();
+        }
+    }, [nearbyCharacters, isFighting]);
+
+    // Cleanup fight interval on unmount
+    useEffect(() => {
+        return () => {
+            if (fightIntervalRef.current) {
+                clearInterval(fightIntervalRef.current);
+            }
+        };
+    }, []);
+
     return (
         <div className="game-map">
             <h1>Game Map</h1>
@@ -300,13 +470,6 @@ const GameMap: React.FC = () => {
                     const isNearby = nearbyCharacters.includes(position.character_id);
                     const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
                     const isCurrentCharacter = position.character_id === currentCharacterId;
-
-                    console.log('Character:', position.character_id, {
-                        isCurrentCharacter,
-                        currentCharacterId,
-                        isNearby,
-                        nearbyCharacters
-                    });
 
                     return (
                         <div
@@ -329,33 +492,58 @@ const GameMap: React.FC = () => {
                         />
                     );
                 })}
-                {/* Render characters on top */}
+                {/* Render characters and health bars */}
                 {positions.map((position) => {
                     const character = characters[position.character_id];
                     const isNearby = nearbyCharacters.includes(position.character_id);
                     const currentCharacterId = parseInt(localStorage.getItem('currentGameCharacterId') || '0');
                     const isCurrentCharacter = position.character_id === currentCharacterId;
+                    const health = playerHealth[position.character_id];
 
                     return character ? (
-                        <div
-                            key={`${position.character_id}-${position.id}`}
-                            style={{
-                                position: 'absolute',
-                                left: `${position.position_x}%`,
-                                top: `${position.position_y}%`,
-                                transform: 'translate(-50%, -50%)',
-                                width: `${CHARACTER_RADIUS * 2}px`,
-                                height: `${CHARACTER_RADIUS * 2}px`,
-                                backgroundImage: `url(${character.image})`,
-                                backgroundSize: 'cover',
-                                borderRadius: '50%',
-                                border: isNearby && isCurrentCharacter ? '3px solid red' : '2px solid white',
-                                boxShadow: '0 0 5px rgba(0,0,0,0.5)',
-                                transition: 'border-color 0.2s ease-in-out',
-                                zIndex: 1
-                            }}
-                            title={`${character.name}${isNearby && isCurrentCharacter ? ' (Nearby)' : ''}`}
-                        />
+                        <div key={`${position.character_id}-${position.id}`}>
+                            {/* Health bar */}
+                            {health && (
+                                <div style={{
+                                    position: 'absolute',
+                                    left: `${position.position_x}%`,
+                                    top: `${position.position_y}%`,
+                                    transform: 'translate(-50%, -150%)',
+                                    width: '100px',
+                                    height: '10px',
+                                    backgroundColor: '#333',
+                                    borderRadius: '5px',
+                                    zIndex: 2
+                                }}>
+                                    <div style={{
+                                        width: `${(health.health / health.maxHealth) * 100}%`,
+                                        height: '100%',
+                                        backgroundColor: health.health > 50 ? '#2ecc71' : health.health > 25 ? '#f1c40f' : '#e74c3c',
+                                        borderRadius: '5px',
+                                        transition: 'width 0.3s ease-in-out, background-color 0.3s ease-in-out'
+                                    }} />
+                                </div>
+                            )}
+                            {/* Character */}
+                            <div
+                                style={{
+                                    position: 'absolute',
+                                    left: `${position.position_x}%`,
+                                    top: `${position.position_y}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    width: `${CHARACTER_RADIUS * 2}px`,
+                                    height: `${CHARACTER_RADIUS * 2}px`,
+                                    backgroundImage: `url(${character.image})`,
+                                    backgroundSize: 'cover',
+                                    borderRadius: '50%',
+                                    border: isNearby && isCurrentCharacter ? '3px solid red' : '2px solid white',
+                                    boxShadow: '0 0 5px rgba(0,0,0,0.5)',
+                                    transition: 'border-color 0.2s ease-in-out',
+                                    zIndex: 1
+                                }}
+                                title={`${character.name}${isNearby && isCurrentCharacter ? ' (Nearby)' : ''}`}
+                            />
+                        </div>
                     ) : null;
                 })}
             </div>
