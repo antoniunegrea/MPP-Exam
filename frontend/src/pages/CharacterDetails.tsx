@@ -1,11 +1,12 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { characters } from '../types/Character';
+import { useCharacters } from '../context/CharacterContext';
 import './CharacterDetails.css';
 
 const CharacterDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { characters } = useCharacters();
   const character = characters.find(c => c.id === Number(id));
 
   if (!character) {
