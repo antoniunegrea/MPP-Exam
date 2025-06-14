@@ -1,158 +1,127 @@
 "use strict";
+var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
+    return new (P || (P = Promise))(function (resolve, reject) {
+        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
+        step((generator = generator.apply(thisArg, _arguments || [])).next());
+    });
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CharacterContext = void 0;
+const supabase_1 = require("../config/supabase");
 class CharacterContext {
-    constructor() {
-        this.characters = [];
-        // Initialize with some default characters
-        this.characters = [
-            {
-                id: 1,
-                name: "Kratos",
-                image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcT7YNUSx1VaJRtF7r_jWNMoZl6ZYgQfJ-7pTw&s",
-                abilities: {
-                    strength: 90,
-                    agility: 70,
-                    defense: 80
-                }
-            },
-            {
-                id: 2,
-                name: "Lara Croft",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 70,
-                    agility: 90,
-                    defense: 60
-                }
-            },
-            {
-                id: 3,
-                name: "Master Chief",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 85,
-                    agility: 75,
-                    defense: 90
-                }
-            },
-            {
-                id: 4,
-                name: "Zelda",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 60,
-                    agility: 80,
-                    defense: 70
-                }
-            },
-            {
-                id: 5,
-                name: "Geralt of Rivia",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 85,
-                    agility: 85,
-                    defense: 75
-                }
-            },
-            {
-                id: 6,
-                name: "Samus Aran",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 75,
-                    agility: 85,
-                    defense: 85
-                }
-            },
-            {
-                id: 7,
-                name: "Doom Slayer",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 95,
-                    agility: 80,
-                    defense: 85
-                }
-            },
-            {
-                id: 8,
-                name: "Cloud Strife",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 80,
-                    agility: 85,
-                    defense: 70
-                }
-            },
-            {
-                id: 9,
-                name: "Aloy",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 70,
-                    agility: 90,
-                    defense: 65
-                }
-            },
-            {
-                id: 10,
-                name: "Mario",
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: 75,
-                    agility: 95,
-                    defense: 60
-                }
-            }
-        ];
-    }
     getAllCharacters() {
-        return this.characters;
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('Fetching all characters from Supabase...');
+            const { data, error } = yield supabase_1.supabase
+                .from('characters')
+                .select('*');
+            if (error) {
+                console.error('Error fetching characters:', error);
+                throw error;
+            }
+            console.log(`Found ${data.length} characters`);
+            return data;
+        });
     }
     getCharacterById(id) {
-        return this.characters.find(char => char.id === id);
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log(`Fetching character with ID: ${id} from Supabase...`);
+            const { data, error } = yield supabase_1.supabase
+                .from('characters')
+                .select('*')
+                .eq('id', id)
+                .single();
+            if (error) {
+                console.error(`Error fetching character ${id}:`, error);
+                return null;
+            }
+            console.log('Found character:', data);
+            return data;
+        });
     }
     addCharacter(character) {
-        const newId = Math.max(...this.characters.map(c => c.id), 0) + 1;
-        const newCharacter = Object.assign(Object.assign({}, character), { id: newId });
-        this.characters.push(newCharacter);
-        return newCharacter;
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log('Adding new character to Supabase:', character);
+            const { data, error } = yield supabase_1.supabase
+                .from('characters')
+                .insert([character])
+                .select()
+                .single();
+            if (error) {
+                console.error('Error adding character:', error);
+                throw error;
+            }
+            console.log('Successfully added character:', data);
+            return data;
+        });
     }
     updateCharacter(id, character) {
-        const index = this.characters.findIndex(char => char.id === id);
-        if (index === -1)
-            return undefined;
-        this.characters[index] = Object.assign(Object.assign({}, this.characters[index]), character);
-        return this.characters[index];
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log(`Updating character ${id} in Supabase:`, character);
+            const { data, error } = yield supabase_1.supabase
+                .from('characters')
+                .update(character)
+                .eq('id', id)
+                .select()
+                .single();
+            if (error) {
+                console.error(`Error updating character ${id}:`, error);
+                return null;
+            }
+            console.log('Successfully updated character:', data);
+            return data;
+        });
     }
     deleteCharacter(id) {
-        const initialLength = this.characters.length;
-        this.characters = this.characters.filter(char => char.id !== id);
-        return this.characters.length !== initialLength;
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log(`Deleting character ${id} from Supabase...`);
+            const { error } = yield supabase_1.supabase
+                .from('characters')
+                .delete()
+                .eq('id', id);
+            if (error) {
+                console.error(`Error deleting character ${id}:`, error);
+                return false;
+            }
+            console.log(`Successfully deleted character ${id}`);
+            return true;
+        });
     }
     generateRandomCharacters(count) {
-        const names = [
-            "Aragorn", "Gandalf", "Legolas", "Gimli", "Frodo",
-            "Samwise", "Merry", "Pippin", "Boromir", "Faramir",
-            "Galadriel", "Elrond", "Arwen", "Eowyn", "Theoden"
-        ];
-        const newCharacters = [];
-        for (let i = 0; i < count; i++) {
-            const randomName = names[Math.floor(Math.random() * names.length)];
-            const newCharacter = {
-                name: randomName,
-                image: "https://i.imgur.com/8Km9tLL.jpg",
-                abilities: {
-                    strength: Math.floor(Math.random() * 41) + 60, // 60-100
-                    agility: Math.floor(Math.random() * 41) + 60, // 60-100
-                    defense: Math.floor(Math.random() * 41) + 60 // 60-100
-                }
-            };
-            newCharacters.push(this.addCharacter(newCharacter));
-        }
-        return newCharacters;
+        return __awaiter(this, void 0, void 0, function* () {
+            console.log(`Generating ${count} random characters in Supabase...`);
+            const names = [
+                "Aragorn", "Gandalf", "Legolas", "Gimli", "Frodo",
+                "Samwise", "Merry", "Pippin", "Boromir", "Faramir",
+                "Galadriel", "Elrond", "Arwen", "Eowyn", "Theoden"
+            ];
+            const characters = [];
+            for (let i = 0; i < count; i++) {
+                const randomName = names[Math.floor(Math.random() * names.length)];
+                characters.push({
+                    name: randomName,
+                    image: "https://i.imgur.com/8Km9tLL.jpg",
+                    abilities: {
+                        strength: Math.floor(Math.random() * 41) + 60, // 60-100
+                        agility: Math.floor(Math.random() * 41) + 60, // 60-100
+                        defense: Math.floor(Math.random() * 41) + 60 // 60-100
+                    }
+                });
+            }
+            const { data, error } = yield supabase_1.supabase
+                .from('characters')
+                .insert(characters)
+                .select();
+            if (error) {
+                console.error('Error generating random characters:', error);
+                throw error;
+            }
+            console.log(`Successfully generated ${data.length} characters`);
+            return data;
+        });
     }
 }
 exports.CharacterContext = CharacterContext;
