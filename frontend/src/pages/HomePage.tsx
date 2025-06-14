@@ -15,6 +15,12 @@ const HomePage: React.FC = () => {
     }
   };
 
+  const handleJoinGame = (e: React.MouseEvent, id: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    navigate(`/game/${id}`);
+  };
+
   return (
     <div className="home-page">
       <div className="header">
@@ -27,6 +33,12 @@ const HomePage: React.FC = () => {
             <div className="character-info">
               <h2>{character.name}</h2>
               <div className="character-actions">
+                <button
+                  className="join-game-button"
+                  onClick={(e) => handleJoinGame(e, character.id)}
+                >
+                  Join Game
+                </button>
                 <button
                   className="edit-button"
                   onClick={(e) => {

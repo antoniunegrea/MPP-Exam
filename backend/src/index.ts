@@ -1,8 +1,19 @@
 import express from 'express';
 import cors from 'cors';
 import { CharacterContext } from './context/CharacterContext';
+import { GameContext } from './context/GameContext';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+    cors: {
+        origin: '*',
+        methods: ['GET', 'POST']
+    }
+});
+
 const port = process.env.PORT || 3001;
 
 // CORS configuration
@@ -26,9 +37,19 @@ app.use((req, res, next) => {
     next();
 });
 
-// Initialize character context
+// Initialize contexts
 const characterContext = new CharacterContext();
-console.log('CharacterContext initialized');
+const gameContext = new GameContext();
+console.log('Contexts initialized');
+
+// WebSocket connection handling
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
 
 // Routes
 app.get('/api/characters', async (req, res) => {
@@ -110,6 +131,50 @@ app.post('/api/characters/generate', async (req, res) => {
     }
 });
 
+// New game endpoints
+app.post('/api/game/join/:characterId', async (req, res) => {
+    try {
+        const characterId = parseInt(req.params.characterId);
+        const position = await gameContext.joinGame(characterId);
+        
+        // Notify all clients about the new player
+        io.emit('playerJoined', position);
+        
+        res.status(201).json(position);
+    } catch (error) {
+        console.error('Error in POST /api/game/join/:characterId:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.delete('/api/game/leave/:characterId', async (req, res) => {
+    try {
+        const characterId = parseInt(req.params.characterId);
+        const success = await gameContext.leaveGame(characterId);
+        
+        if (success) {
+            // Notify all clients about the player leaving
+            io.emit('playerLeft', characterId);
+            res.status(204).send();
+        } else {
+            res.status(404).json({ message: 'Character not found in game' });
+        }
+    } catch (error) {
+        console.error('Error in DELETE /api/game/leave/:characterId:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.get('/api/game/positions', async (req, res) => {
+    try {
+        const positions = await gameContext.getAllPositions();
+        res.json(positions);
+    } catch (error) {
+        console.error('Error in GET /api/game/positions:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error('Unhandled error:', err);
@@ -117,7 +182,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 });
 
 // Start server
-app.listen(port, () => {
+httpServer.listen(port, () => {
     console.log(`Server is running on port ${port}`);
     console.log(`API endpoints available at http://localhost:${port}/api/characters`);
 });

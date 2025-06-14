@@ -5,6 +5,7 @@ import CharacterDetails from './pages/CharacterDetails';
 import AddCharacter from './pages/AddCharacter';
 import EditCharacter from './pages/EditCharacter';
 import Statistics from './pages/Statistics';
+import GameMap from './pages/GameMap';
 import { CharacterProvider } from './context/CharacterContext';
 import './App.css';
 
@@ -25,6 +26,7 @@ function App() {
             <Route path="/add" element={<AddCharacter />} />
             <Route path="/edit/:id" element={<EditCharacter />} />
             <Route path="/statistics" element={<Statistics />} />
+            <Route path="/game/:characterId" element={<GameMap />} />
           </Routes>
         </div>
       </Router>
