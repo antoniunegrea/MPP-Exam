@@ -5,14 +5,24 @@ import { CharacterContext } from './context/CharacterContext';
 const app = express();
 const port = process.env.PORT || 3001;
 
+// CORS configuration
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
+
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Debug middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
     next();
 });
 

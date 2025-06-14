@@ -17,13 +17,22 @@ const cors_1 = __importDefault(require("cors"));
 const CharacterContext_1 = require("./context/CharacterContext");
 const app = (0, express_1.default)();
 const port = process.env.PORT || 3001;
+// CORS configuration
+const corsOptions = {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+    optionsSuccessStatus: 200
+};
 // Middleware
-app.use((0, cors_1.default)());
+app.use((0, cors_1.default)(corsOptions));
 app.use(express_1.default.json());
 // Debug middleware
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
     console.log('Request Body:', req.body);
+    console.log('Request Headers:', req.headers);
     next();
 });
 // Initialize character context
