@@ -1,0 +1,105 @@
+.character-details {
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.back-button {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0.5rem 0;
+  margin-bottom: 2rem;
+  transition: color 0.2s;
+}
+
+.back-button:hover {
+  color: #333;
+}
+
+.character-content {
+  display: flex;
+  gap: 2rem;
+  background: white;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.character-content img {
+  width: 300px;
+  height: auto;
+  border-radius: 8px;
+}
+
+.character-info {
+  flex: 1;
+}
+
+.character-info h1 {
+  margin: 0 0 1.5rem 0;
+  color: #333;
+}
+
+.abilities h2 {
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+.ability-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ability {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.ability-name {
+  width: 100px;
+  font-weight: 500;
+  color: #444;
+}
+
+.ability-bar {
+  flex: 1;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.ability-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4CAF50, #8BC34A);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.ability-value {
+  width: 50px;
+  text-align: right;
+  font-weight: 500;
+  color: #666;
+}
+
+.abilities ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.abilities li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #eee;
+  color: #444;
+}
+
+.abilities li:last-child {
+  border-bottom: none;
+} 
