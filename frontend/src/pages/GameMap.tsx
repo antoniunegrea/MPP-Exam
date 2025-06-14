@@ -28,6 +28,8 @@ const GameMap: React.FC = () => {
     const [hasJoined, setHasJoined] = useState(false);
     const isJoiningRef = useRef(false);
     const isMovingRef = useRef(false);
+    const moveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const currentPositionRef = useRef<GamePosition | null>(null);
 
     const handleKeyPress = async (event: KeyboardEvent) => {
         if (!characterId || isMovingRef.current) return;
@@ -35,51 +37,89 @@ const GameMap: React.FC = () => {
         const storedCharacterId = localStorage.getItem('currentGameCharacterId');
         if (!storedCharacterId) return;
 
-        const currentPosition = positions.find(p => p.character_id === parseInt(storedCharacterId));
-        if (!currentPosition) return;
+        if (!currentPositionRef.current) {
+            currentPositionRef.current = positions.find(p => p.character_id === parseInt(storedCharacterId)) || null;
+            if (!currentPositionRef.current) return;
+        }
 
-        let newX = currentPosition.position_x;
-        let newY = currentPosition.position_y;
+        let newX = currentPositionRef.current.position_x;
+        let newY = currentPositionRef.current.position_y;
 
+        // Calculate new position based on key press
         switch (event.key) {
             case 'ArrowUp':
-                newY = Math.max(0, currentPosition.position_y - MOVE_STEP);
+                newY = Math.max(0, currentPositionRef.current.position_y - MOVE_STEP);
                 break;
             case 'ArrowDown':
-                newY = Math.min(100, currentPosition.position_y + MOVE_STEP);
+                newY = Math.min(100, currentPositionRef.current.position_y + MOVE_STEP);
                 break;
             case 'ArrowLeft':
-                newX = Math.max(0, currentPosition.position_x - MOVE_STEP);
+                newX = Math.max(0, currentPositionRef.current.position_x - MOVE_STEP);
                 break;
             case 'ArrowRight':
-                newX = Math.min(100, currentPosition.position_x + MOVE_STEP);
+                newX = Math.min(100, currentPositionRef.current.position_x + MOVE_STEP);
                 break;
             default:
                 return;
         }
 
         // Only update if position actually changed
-        if (newX === currentPosition.position_x && newY === currentPosition.position_y) return;
+        if (newX === currentPositionRef.current.position_x && newY === currentPositionRef.current.position_y) {
+            console.log('[GameMap] Position unchanged, skipping update');
+            return;
+        }
+
+        console.log(`[GameMap] Current position: (${currentPositionRef.current.position_x}, ${currentPositionRef.current.position_y})`);
+        console.log(`[GameMap] New position: (${newX}, ${newY})`);
+
+        // Clear any existing timeout
+        if (moveTimeoutRef.current) {
+            clearTimeout(moveTimeoutRef.current);
+        }
 
         isMovingRef.current = true;
         try {
-            console.log(`[GameMap] Moving character ${storedCharacterId} to (${newX}, ${newY})`);
+            // Update local state immediately for smooth movement
+            const newPosition = {
+                ...currentPositionRef.current,
+                position_x: newX,
+                position_y: newY
+            };
+            currentPositionRef.current = newPosition;
+
+            setPositions(prev => prev.map(pos => 
+                pos.character_id === parseInt(storedCharacterId)
+                    ? newPosition
+                    : pos
+            ));
+
+            // Send update to server
             const response = await axios.put(`http://localhost:3001/api/game/move/${storedCharacterId}`, {
                 position_x: newX,
                 position_y: newY
             });
             console.log('[GameMap] Move response:', response.data);
 
-            // Update local positions state
-            setPositions(prev => prev.map(pos => 
-                pos.character_id === parseInt(storedCharacterId)
-                    ? { ...pos, position_x: newX, position_y: newY }
-                    : pos
-            ));
+            // Set a timeout to allow the next move
+            moveTimeoutRef.current = setTimeout(() => {
+                isMovingRef.current = false;
+            }, 50); // 50ms delay between moves
         } catch (error) {
             console.error('[GameMap] Error moving character:', error);
-        } finally {
+            // Revert local state on error
+            setPositions(prev => prev.map(pos => 
+                pos.character_id === parseInt(storedCharacterId)
+                    ? currentPositionRef.current!
+                    : pos
+            ));
             isMovingRef.current = false;
+        }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            event.preventDefault(); // Prevent page scrolling
+            handleKeyPress(event);
         }
     };
 
@@ -171,18 +211,32 @@ const GameMap: React.FC = () => {
             setPositions(prev => prev.filter(pos => pos.character_id !== characterId));
         });
 
-        // Add keyboard event listener
-        window.addEventListener('keydown', handleKeyPress);
+        // Add keyboard event listeners
+        window.addEventListener('keydown', handleKeyDown);
 
         // Cleanup function
         return () => {
             console.log('[GameMap] Component unmounting, cleaning up...');
             newSocket.close();
-            window.removeEventListener('keydown', handleKeyPress);
+            window.removeEventListener('keydown', handleKeyDown);
+            if (moveTimeoutRef.current) {
+                clearTimeout(moveTimeoutRef.current);
+            }
             // Remove character ID from localStorage when component unmounts
             localStorage.removeItem('currentGameCharacterId');
         };
     }, [characterId, hasJoined]);
+
+    // Update currentPositionRef when positions change
+    useEffect(() => {
+        const storedCharacterId = localStorage.getItem('currentGameCharacterId');
+        if (storedCharacterId) {
+            const newPosition = positions.find(p => p.character_id === parseInt(storedCharacterId));
+            if (newPosition) {
+                currentPositionRef.current = newPosition;
+            }
+        }
+    }, [positions]);
 
     const handleLeaveGame = async () => {
         console.log('[GameMap] Handling leave game');
