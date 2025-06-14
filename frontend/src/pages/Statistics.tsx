@@ -25,53 +25,66 @@ ChartJS.register(
   Title
 );
 
+const WS_URL = 'ws://localhost:3001';
+
 const Statistics: React.FC = () => {
   const { characters, addCharacter } = useCharacters();
   const [chartData, setChartData] = useState<any>(null);
   const [barData, setBarData] = useState<any>(null);
   const [isGenerating, setIsGenerating] = useState(false);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
-  const generateRandomCharacter = (): Omit<Character, 'id'> => {
-    const names = ['Warrior', 'Mage', 'Archer', 'Knight', 'Rogue', 'Paladin', 'Wizard', 'Berserker', 'Monk', 'Druid'];
-    const randomName = `${names[Math.floor(Math.random() * names.length)]} ${Math.floor(Math.random() * 1000)}`;
-    
-    return {
-      name: randomName,
-      image: 'https://picsum.photos/200',
-      abilities: {
-        strength: Math.floor(Math.random() * 100),
-        agility: Math.floor(Math.random() * 100),
-        defense: Math.floor(Math.random() * 100)
+  useEffect(() => {
+    // Initialize WebSocket connection
+    wsRef.current = new WebSocket(WS_URL);
+
+    wsRef.current.onopen = () => {
+      console.log('WebSocket connected');
+    };
+
+    wsRef.current.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      switch (data.type) {
+        case 'NEW_CHARACTER':
+          addCharacter(data.character);
+          break;
+        case 'GENERATION_STARTED':
+          setIsGenerating(true);
+          break;
+        case 'GENERATION_STOPPED':
+          setIsGenerating(false);
+          break;
       }
     };
-  };
+
+    wsRef.current.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+
+    wsRef.current.onclose = () => {
+      console.log('WebSocket disconnected');
+    };
+
+    // Cleanup on unmount
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, [addCharacter]);
 
   const startGenerating = () => {
-    if (!isGenerating) {
-      setIsGenerating(true);
-      intervalRef.current = setInterval(() => {
-        addCharacter(generateRandomCharacter());
-      }, 1000);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'START_GENERATION' }));
     }
   };
 
   const stopGenerating = () => {
-    if (isGenerating && intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-      setIsGenerating(false);
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'STOP_GENERATION' }));
     }
   };
-
-  // Cleanup interval on component unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     // Prepare data for pie chart (distribution of strength values)
