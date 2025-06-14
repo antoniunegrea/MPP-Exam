@@ -19,9 +19,6 @@ const HomePage: React.FC = () => {
     <div className="home-page">
       <div className="header">
         <h1>Game Characters</h1>
-        <button className="add-button" onClick={() => navigate('/add')}>
-          Add Character
-        </button>
       </div>
       <div className="characters-grid">
         {characters.map((character) => (

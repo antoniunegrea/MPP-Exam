@@ -1,0 +1,71 @@
+.statistics-container {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.statistics-container h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #333;
+}
+
+.charts-container {
+  display: flex;
+  justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+
+.chart {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  min-width: 300px;
+  max-width: 500px;
+}
+
+.chart h2 {
+  text-align: center;
+  margin-bottom: 1rem;
+  color: #444;
+  font-size: 1.2rem;
+}
+
+.generate-button {
+  display: block;
+  margin: 2rem auto;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.generate-button.start {
+  background-color: #4CAF50;
+}
+
+.generate-button.start:hover {
+  background-color: #45a049;
+}
+
+.generate-button.start:active {
+  background-color: #3d8b40;
+}
+
+.generate-button.stop {
+  background-color: #f44336;
+}
+
+.generate-button.stop:hover {
+  background-color: #da190b;
+}
+
+.generate-button.stop:active {
+  background-color: #c41810;
+} 
